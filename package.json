@@ -8,12 +8,20 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js"
   },
-  "keywords": ["social-media", "content-planner", "claude", "ai"],
+  "keywords": [
+    "social-media",
+    "content-planner",
+    "claude",
+    "ai"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.56.0",
+    "@anthropic-ai/sdk": "0.56.0",
+    "cheerio": "1.2.0",
     "dotenv": "^16.5.0",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "node-fetch": "3.3.2",
+    "openai": "7.5.0"
   }
 }

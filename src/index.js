@@ -2,12 +2,16 @@ import 'dotenv/config';
 import express from 'express';
 import contentRoutes from './routes/content.js';
 import analyzeRoutes from './routes/analyze.js';
+import generateRoutes from './routes/generate.js';
 import testApiRoutes from './routes/test-api.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
+// Статические файлы (веб-интерфейс)
+app.use(express.static('public'));
 
 // Health check — для Railway (Railway периодически пингует этот URL, чтобы убедиться что сервис жив)
 app.get('/health', (_req, res) => {
@@ -19,8 +23,11 @@ app.use('/api/test-api', testApiRoutes);
 
 app.use('/api/content', contentRoutes);
 
-// Анализ VK-страницы + генерация 20 постов через мульти-агентный пайплайн
+// Анализ канала + генерация постов (новый workflow v2)
 app.use('/api/analyze', analyzeRoutes);
+
+// Генерация изображений через Grok
+app.use('/api/generate', generateRoutes);
 
 app.listen(PORT, () => {
   console.log(`Social Train running on port ${PORT}`);

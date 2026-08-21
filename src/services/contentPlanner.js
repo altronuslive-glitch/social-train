@@ -1,9 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { callDeepSeek } from './deepseek.js';
 
 /**
- * Генерирует план контента на месяц через Claude
+ * Генерирует план контента на месяц через DeepSeek
  * @param {object} params
  * @param {string} params.topic     — тема или описание бизнеса
  * @param {string} [params.audience] — целевая аудитория
@@ -25,18 +23,15 @@ export async function generateContentPlan({ topic, audience, tone, month }) {
 Сгенерируй 20 постов, равномерно распределённых по 4 неделям (5 постов в неделю).
 Верни только JSON, без лишнего текста.`;
 
-  const message = await client.messages.create({
-    model: 'claude-opus-5',
-    max_tokens: 4096,
-    messages: [{ role: 'user', content: userPrompt }],
-    system: systemPrompt,
+  const raw = await callDeepSeek({
+    systemPrompt,
+    userPrompt,
+    maxTokens: 4096,
   });
 
-  const raw = message.content[0].text;
-
-  // Парсим JSON из ответа Claude
+  // Парсим JSON из ответа DeepSeek
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Claude вернул невалидный JSON');
+  if (!jsonMatch) throw new Error('DeepSeek вернул невалидный JSON');
 
   return JSON.parse(jsonMatch[0]);
 }
