@@ -81,16 +81,36 @@ ${feedback ? `\nЗАМЕЧАНИЯ АРТ-ДИРЕКТОРА (ОБЯЗАТЕЛЬ
     maxTokens: 2000,
   });
 
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('SMM Agent: невалидный JSON');
+  // Находим первый JSON объект
+  const jsonStart = raw.indexOf('{');
+  if (jsonStart === -1) throw new Error('SMM Agent: невалидный JSON - не найдена открывающая скобка');
+
+  // Ищем корректный конец JSON, игнорируя текст после него
+  let depth = 0;
+  let jsonEnd = -1;
+
+  for (let i = jsonStart; i < raw.length; i++) {
+    if (raw[i] === '{') depth++;
+    if (raw[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        jsonEnd = i + 1;
+        break;
+      }
+    }
+  }
+
+  if (jsonEnd === -1) throw new Error('SMM Agent: невалидный JSON - не найдена закрывающая скобка');
+
+  const jsonString = raw.substring(jsonStart, jsonEnd);
 
   let result;
   try {
-    result = JSON.parse(jsonMatch[0]);
+    result = JSON.parse(jsonString);
   } catch (parseError) {
     console.warn('SMM Agent: попытка исправить JSON...');
 
-    let fixed = jsonMatch[0];
+    let fixed = jsonString;
 
     // Удаляем trailing запятые
     fixed = fixed.replace(/,(\s*[\]}])/g, '$1');
@@ -116,6 +136,7 @@ ${feedback ? `\nЗАМЕЧАНИЯ АРТ-ДИРЕКТОРА (ОБЯЗАТЕЛЬ
       result = JSON.parse(fixed);
       console.log('✅ SMM Agent: JSON исправлен');
     } catch (fixError) {
+      console.error('SMM Agent: raw response:', raw.substring(0, 500));
       throw new Error(`SMM Agent: не удалось исправить JSON. ${fixError.message}`);
     }
   }

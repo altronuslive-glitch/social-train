@@ -61,24 +61,39 @@ export async function generateImagePrompt({ imageBrief, profile, target = 'flux'
     maxTokens: 1500,
   });
 
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Image Agent: невалидный JSON');
+  // Находим первый JSON объект по скобкам
+  const jsonStart = raw.indexOf('{');
+  if (jsonStart === -1) throw new Error('Image Agent: невалидный JSON - не найдена открывающая скобка');
+
+  // Ищем корректный конец JSON
+  let depth = 0;
+  let jsonEnd = -1;
+
+  for (let i = jsonStart; i < raw.length; i++) {
+    if (raw[i] === '{') depth++;
+    if (raw[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        jsonEnd = i + 1;
+        break;
+      }
+    }
+  }
+
+  if (jsonEnd === -1) throw new Error('Image Agent: невалидный JSON - не найдена закрывающая скобка');
+
+  const jsonString = raw.substring(jsonStart, jsonEnd);
 
   let result;
   try {
-    result = JSON.parse(jsonMatch[0]);
+    result = JSON.parse(jsonString);
   } catch (parseError) {
     console.warn('Image Agent: попытка исправить JSON...');
 
-    let fixed = jsonMatch[0];
-
-    // Удаляем trailing запятые
+    let fixed = jsonString;
     fixed = fixed.replace(/,(\s*[\]}])/g, '$1');
-
-    // Исправляем одинарные кавычки на двойные
     fixed = fixed.replace(/'([^']+)':/g, '"$1":');
 
-    // Закрываем незакрытые структуры
     const openBraces = (fixed.match(/\{/g) || []).length;
     const closeBraces = (fixed.match(/\}/g) || []).length;
     const openBrackets = (fixed.match(/\[/g) || []).length;
@@ -96,6 +111,7 @@ export async function generateImagePrompt({ imageBrief, profile, target = 'flux'
       result = JSON.parse(fixed);
       console.log('✅ Image Agent: JSON исправлен');
     } catch (fixError) {
+      console.error('Image Agent: raw response:', raw.substring(0, 500));
       throw new Error(`Image Agent: не удалось исправить JSON. ${fixError.message}`);
     }
   }
