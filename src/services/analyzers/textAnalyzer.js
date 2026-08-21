@@ -113,7 +113,40 @@ ${postsText}`;
     throw new Error('Text Analyzer: DeepSeek вернул невалидный JSON');
   }
 
-  const analysis = JSON.parse(jsonMatch[0]);
+  let analysis;
+  try {
+    analysis = JSON.parse(jsonMatch[0]);
+  } catch (parseError) {
+    console.warn('Попытка исправить JSON от Text Analyzer...');
+
+    let fixed = jsonMatch[0];
+
+    // Удаляем trailing запятые
+    fixed = fixed.replace(/,(\s*[\]}])/g, '$1');
+
+    // Пытаемся закрыть незакрытые массивы и объекты
+    const openBraces = (fixed.match(/\{/g) || []).length;
+    const closeBraces = (fixed.match(/\}/g) || []).length;
+    const openBrackets = (fixed.match(/\[/g) || []).length;
+    const closeBrackets = (fixed.match(/\]/g) || []).length;
+
+    // Закрываем незакрытые массивы
+    for (let i = 0; i < openBrackets - closeBrackets; i++) {
+      fixed = fixed.replace(/\s*$/, '\n]');
+    }
+
+    // Закрываем незакрытые объекты
+    for (let i = 0; i < openBraces - closeBraces; i++) {
+      fixed = fixed.replace(/\s*$/, '\n}');
+    }
+
+    try {
+      analysis = JSON.parse(fixed);
+      console.log('✅ JSON успешно исправлен');
+    } catch (fixError) {
+      throw new Error(`Text Analyzer: Не удалось исправить JSON. Ошибка: ${fixError.message}`);
+    }
+  }
 
   // Добавляем метаинформацию
   analysis.meta = {

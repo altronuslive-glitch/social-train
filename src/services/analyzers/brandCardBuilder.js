@@ -118,7 +118,35 @@ ${JSON.stringify(imageAnalysis, null, 2)}
     throw new Error('Brand Card Builder: DeepSeek вернул невалидный JSON');
   }
 
-  const brandCard = JSON.parse(jsonMatch[0]);
+  let brandCard;
+  try {
+    brandCard = JSON.parse(jsonMatch[0]);
+  } catch (parseError) {
+    console.warn('Попытка исправить JSON от Brand Card Builder...');
+
+    let fixed = jsonMatch[0];
+    fixed = fixed.replace(/,(\s*[\]}])/g, '$1');
+
+    const openBraces = (fixed.match(/\{/g) || []).length;
+    const closeBraces = (fixed.match(/\}/g) || []).length;
+    const openBrackets = (fixed.match(/\[/g) || []).length;
+    const closeBrackets = (fixed.match(/\]/g) || []).length;
+
+    for (let i = 0; i < openBrackets - closeBrackets; i++) {
+      fixed = fixed.replace(/\s*$/, '\n]');
+    }
+
+    for (let i = 0; i < openBraces - closeBraces; i++) {
+      fixed = fixed.replace(/\s*$/, '\n}');
+    }
+
+    try {
+      brandCard = JSON.parse(fixed);
+      console.log('✅ JSON успешно исправлен');
+    } catch (fixError) {
+      throw new Error(`Brand Card Builder: Не удалось исправить JSON. Ошибка: ${fixError.message}`);
+    }
+  }
 
   // Добавляем метаинформацию
   brandCard.meta = {

@@ -77,12 +77,45 @@ ${contentTypesStr}
     temperature: 0.8, // выше температура для креативности
   });
 
-  const jsonMatch = topicsRaw.match(/\{[\s\S]*\}/);
+  // Улучшенная обработка JSON - иногда DeepSeek добавляет текст после JSON
+  let jsonMatch = topicsRaw.match(/\{[\s\S]*\}/);
+
   if (!jsonMatch) {
     throw new Error('Topic Generator: DeepSeek вернул невалидный JSON');
   }
 
-  const result = JSON.parse(jsonMatch[0]);
+  let result;
+  try {
+    result = JSON.parse(jsonMatch[0]);
+  } catch (parseError) {
+    // Пытаемся исправить типичные ошибки DeepSeek
+    console.warn('Попытка исправить JSON от DeepSeek...');
+
+    let fixed = jsonMatch[0];
+
+    // Удаляем trailing запятые перед ] или }
+    fixed = fixed.replace(/,(\s*[\]}])/g, '$1');
+
+    // Пытаемся закрыть незавершенный массив topics
+    if (fixed.includes('"topics"') && !fixed.includes(']')) {
+      // Находим последнюю открывающую скобку массива
+      const topicsIndex = fixed.lastIndexOf('"topics"');
+      const arrayStart = fixed.indexOf('[', topicsIndex);
+      if (arrayStart !== -1) {
+        // Добавляем закрывающую скобку массива перед закрывающей скобкой объекта
+        fixed = fixed.replace(/\s*\}$/, '\n  ]\n}');
+      }
+    }
+
+    try {
+      result = JSON.parse(fixed);
+      console.log('✅ JSON успешно исправлен');
+    } catch (fixError) {
+      // Если всё равно не парсится - создаем fallback темы
+      console.error('Не удалось исправить JSON, используем fallback темы');
+      result = createFallbackTopics(brandCard, count);
+    }
+  }
 
   // Добавляем метаинформацию к каждой теме
   result.topics = result.topics.map(topic => ({
@@ -92,4 +125,42 @@ ${contentTypesStr}
   }));
 
   return result.topics;
+}
+
+/**
+ * Создает fallback темы если DeepSeek вернул невалидный JSON.
+ * @param {object} brandCard - карточка бренда
+ * @param {number} count - количество тем
+ * @returns {object[]} массив fallback тем
+ */
+function createFallbackTopics(brandCard, count) {
+  const baseTopics = [
+    { type: 'полезный совет', goal: 'обучить' },
+    { type: 'личная история', goal: 'вовлечь' },
+    { type: 'кейс', goal: 'показать экспертизу' },
+    { type: 'отзыв', goal: 'повысить доверие' },
+    { type: 'за кулисами', goal: 'создать близость' },
+    { type: 'FAQ', goal: 'закрыть возражения' },
+    { type: 'тренд', goal: 'показать актуальность' },
+    { type: 'челлендж', goal: 'вовлечь' },
+    { type: 'лайфхак', goal: 'дать пользу' },
+    { type: 'сравнение', goal: 'помочь выбрать' },
+  ];
+
+  const topics = [];
+  for (let i = 0; i < count; i++) {
+    const base = baseTopics[i % baseTopics.length];
+    topics.push({
+      id: i + 1,
+      title: `${base.type} #${Math.floor(i / baseTopics.length) + 1}`,
+      description: `Пост типа "${base.type}" для аудитории: ${brandCard.audience?.portrait || 'целевая аудитория'}`,
+      contentType: base.type,
+      goal: base.goal,
+      targetAudience: brandCard.audience?.portrait || 'целевая аудитория',
+      visualSuggestion: 'Релевантное изображение в соответствии с визуальным стилем бренда',
+      keyMessage: `Основная мысль для темы "${base.type}"`
+    });
+  }
+
+  return { topics };
 }
