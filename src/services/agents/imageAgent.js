@@ -64,5 +64,41 @@ export async function generateImagePrompt({ imageBrief, profile, target = 'flux'
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('Image Agent: невалидный JSON');
 
-  return JSON.parse(jsonMatch[0]);
+  let result;
+  try {
+    result = JSON.parse(jsonMatch[0]);
+  } catch (parseError) {
+    console.warn('Image Agent: попытка исправить JSON...');
+
+    let fixed = jsonMatch[0];
+
+    // Удаляем trailing запятые
+    fixed = fixed.replace(/,(\s*[\]}])/g, '$1');
+
+    // Исправляем одинарные кавычки на двойные
+    fixed = fixed.replace(/'([^']+)':/g, '"$1":');
+
+    // Закрываем незакрытые структуры
+    const openBraces = (fixed.match(/\{/g) || []).length;
+    const closeBraces = (fixed.match(/\}/g) || []).length;
+    const openBrackets = (fixed.match(/\[/g) || []).length;
+    const closeBrackets = (fixed.match(/\]/g) || []).length;
+
+    for (let i = 0; i < openBrackets - closeBrackets; i++) {
+      fixed = fixed.replace(/\s*$/, '\n]');
+    }
+
+    for (let i = 0; i < openBraces - closeBraces; i++) {
+      fixed = fixed.replace(/\s*$/, '\n}');
+    }
+
+    try {
+      result = JSON.parse(fixed);
+      console.log('✅ Image Agent: JSON исправлен');
+    } catch (fixError) {
+      throw new Error(`Image Agent: не удалось исправить JSON. ${fixError.message}`);
+    }
+  }
+
+  return result;
 }
