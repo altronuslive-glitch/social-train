@@ -435,7 +435,7 @@
       hideElement('step1');
       hideElement('errorCard');
       showElement('loading');
-      setProgress(10, 'Парсинг постов...');
+      setProgress(0, 'Запуск анализа...');
 
       try {
         const response = await fetch('/api/analyze/channel', {
@@ -450,12 +450,27 @@
           throw new Error(data.error || 'Ошибка анализа');
         }
 
-        setProgress(50, 'Анализ текста и изображений...');
+        // Имитация прогресса с более детальными сообщениями
+        setProgress(10, '📥 Парсинг постов из Telegram...');
+        await sleep(300);
+
+        setProgress(25, '📝 Анализ текстового контента (tone of voice, структура)...');
+        await sleep(800);
+
+        setProgress(45, '🎨 Анализ визуального контента (изображения, стиль)...');
+        await sleep(800);
+
+        setProgress(65, '✅ Анализ завершён, формирование карточки бренда...');
         await sleep(500);
-        setProgress(80, 'Формирование карточки бренда...');
+
+        setProgress(85, '🎯 Создание единой карточки бренда...');
+        await sleep(400);
+
+        setProgress(95, '💡 Генерация 20 релевантных тем для постов...');
         await sleep(500);
-        setProgress(100, 'Генерация тем...');
-        await sleep(500);
+
+        setProgress(100, '✅ Готово!');
+        await sleep(300);
 
         currentData.brandCard = data.brandCard;
         currentData.topics = data.topics;
@@ -514,7 +529,7 @@
 
       hideElement('step2');
       showElement('loading');
-      setProgress(10, `Генерация ${selectedIds.length} постов...`);
+      setProgress(5, `🤖 Начинаю генерацию ${selectedIds.length} постов...`);
 
       try {
         const response = await fetch('/api/analyze/generate-posts', {
@@ -533,9 +548,20 @@
           throw new Error(data.error || 'Ошибка генерации постов');
         }
 
+        // Имитируем прогресс для каждого поста
+        const progressStep = 90 / selectedIds.length;
+        for (let i = 0; i < selectedIds.length; i++) {
+          const topicTitle = currentData.topics.find(t => t.id === selectedIds[i])?.title || `тема ${i + 1}`;
+          setProgress(
+            10 + (i + 1) * progressStep,
+            `✍️  Генерация поста ${i + 1}/${selectedIds.length}: "${topicTitle}"\n(SMM Agent → Image Agent → Art Director)`
+          );
+          await sleep(800);
+        }
+
         currentData.posts = data.posts;
 
-        setProgress(100, 'Готово!');
+        setProgress(100, '✅ Все посты сгенерированы!');
         await sleep(500);
 
         displayPosts(data.posts);
@@ -597,9 +623,22 @@
 
       showElement('loading');
       hideElement('step3');
-      setProgress(10, 'Генерация изображений...');
+      setProgress(5, '🎨 Подготовка к генерации изображений...');
 
       try {
+        const totalPosts = currentData.posts.length;
+        const progressStep = 90 / totalPosts;
+
+        // Показываем прогресс для каждого изображения
+        for (let i = 0; i < totalPosts; i++) {
+          const post = currentData.posts[i];
+          setProgress(
+            10 + i * progressStep,
+            `🖼️  Генерация изображения ${i + 1}/${totalPosts}: "${post.topicTitle}"`
+          );
+          await sleep(300);
+        }
+
         const response = await fetch('/api/generate/images', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -615,19 +654,30 @@
           throw new Error(data.error || 'Ошибка генерации изображений');
         }
 
+        setProgress(95, '✅ Обработка результатов...');
+        await sleep(300);
+
         // Отображаем изображения
         data.results.forEach((result, i) => {
           const imgDiv = document.getElementById(`postImage${result.postIndex}`);
           if (result.status === 'success' && result.imageUrl) {
             imgDiv.innerHTML = `<img src="${result.imageUrl}" alt="Generated image">`;
           } else {
-            imgDiv.innerHTML = `<p style="color: #e53e3e;">Ошибка: ${result.error}</p>`;
+            imgDiv.innerHTML = `<p style="color: #e53e3e;">❌ Ошибка генерации: ${result.error}</p>`;
           }
         });
 
+        setProgress(100, `✅ Готово! Успешно: ${data.successCount}/${data.total}`);
+        await sleep(500);
+
         hideElement('loading');
         showElement('step3');
-        alert(`Готово! Успешно: ${data.successCount}/${data.total}`);
+
+        if (data.successCount < data.total) {
+          alert(`Генерация завершена с ошибками.\nУспешно: ${data.successCount}/${data.total}\nПроверьте Grok API ключ и попробуйте снова.`);
+        } else {
+          alert(`✅ Все изображения успешно сгенерированы!`);
+        }
 
       } catch (error) {
         showError(error.message);

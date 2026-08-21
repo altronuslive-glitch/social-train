@@ -31,10 +31,21 @@ const MAX_RETRIES = 2;
 export async function analyzeChannelAndGenerateTopics(posts, onProgress) {
   console.log('📊 Этап 1: Параллельный анализ текста и изображений...');
 
+  if (onProgress) onProgress({ step: 'text_analysis_start' });
+
   // Параллельно запускаем два агента анализа
   const [textAnalysis, imageAnalysis] = await Promise.all([
-    analyzeTextContent(posts),
-    analyzeImageContent(posts),
+    (async () => {
+      const result = await analyzeTextContent(posts);
+      if (onProgress) onProgress({ step: 'text_analysis_complete', data: result });
+      return result;
+    })(),
+    (async () => {
+      if (onProgress) onProgress({ step: 'image_analysis_start' });
+      const result = await analyzeImageContent(posts);
+      if (onProgress) onProgress({ step: 'image_analysis_complete', data: result });
+      return result;
+    })(),
   ]);
 
   if (onProgress) onProgress({ step: 'analysis_complete', textAnalysis, imageAnalysis });
@@ -44,6 +55,8 @@ export async function analyzeChannelAndGenerateTopics(posts, onProgress) {
   console.log(`   - Изображения: проанализировано ${imageAnalysis.meta?.analyzedImagesCount || 0} картинок`);
 
   console.log('\n🎨 Этап 2: Формирование карточки бренда...');
+  if (onProgress) onProgress({ step: 'brand_card_start' });
+
   const brandCard = await buildBrandCard(textAnalysis, imageAnalysis);
 
   if (onProgress) onProgress({ step: 'brand_card_complete', brandCard });
@@ -53,6 +66,8 @@ export async function analyzeChannelAndGenerateTopics(posts, onProgress) {
   console.log(`   - Типов контента: ${brandCard.contentTypes?.length || 0}`);
 
   console.log('\n💡 Этап 3: Генерация тем для постов...');
+  if (onProgress) onProgress({ step: 'topics_start' });
+
   const topics = await generateTopics(brandCard, 20);
 
   if (onProgress) onProgress({ step: 'topics_complete', topics });
