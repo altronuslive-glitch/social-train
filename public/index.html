@@ -153,11 +153,65 @@
       margin-bottom: 8px;
     }
 
+    .topics-section {
+      margin-top: 30px;
+    }
+
+    .topic-group {
+      margin-bottom: 30px;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .topic-group-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: opacity 0.3s;
+    }
+
+    .topic-group-header:hover {
+      opacity: 0.9;
+    }
+
+    .topic-group-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+
+    .topic-group-icon {
+      font-size: 1.5rem;
+    }
+
+    .topic-group-badge {
+      background: rgba(255, 255, 255, 0.3);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+    }
+
+    .topic-group-content {
+      padding: 20px;
+      background: white;
+    }
+
+    .topic-group-content.collapsed {
+      display: none;
+    }
+
     .topics-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
       gap: 15px;
-      margin-top: 20px;
+      margin-top: 0;
     }
 
     .topic-card {
@@ -366,8 +420,8 @@
       <div class="brand-card" id="brandCardDisplay"></div>
 
       <h2 style="margin-top: 30px;">Выберите темы для постов:</h2>
-      <p style="margin-bottom: 15px; color: #666;">Выберите до 20 тем, по которым будут сгенерированы посты</p>
-      <div class="topics-grid" id="topicsGrid"></div>
+      <p style="margin-bottom: 15px; color: #666;">Темы сгруппированы по типам контента. Нажмите на группу чтобы свернуть/развернуть.</p>
+      <div class="topics-section" id="topicsGrid"></div>
 
       <div style="margin-top: 20px;">
         <button class="btn" onclick="generatePosts()">Сгенерировать посты по выбранным темам</button>
@@ -474,10 +528,11 @@
 
         currentData.brandCard = data.brandCard;
         currentData.topics = data.topics;
+        currentData.groups = data.groups;
         currentData.channel = data.channel;
 
         displayBrandCard(data.brandCard);
-        displayTopics(data.topics);
+        displayTopicsGrouped(data.groups || []);
 
         hideElement('loading');
         showElement('step2');
@@ -499,6 +554,49 @@
       document.getElementById('brandCardDisplay').innerHTML = html;
     }
 
+    function displayTopicsGrouped(groups) {
+      const container = document.getElementById('topicsGrid');
+
+      if (!groups || groups.length === 0) {
+        // Fallback на обычное отображение если нет групп
+        displayTopics(currentData.topics);
+        return;
+      }
+
+      let html = '';
+
+      groups.forEach((group, groupIndex) => {
+        html += `
+          <div class="topic-group">
+            <div class="topic-group-header" onclick="toggleGroup(${groupIndex})">
+              <div class="topic-group-title">
+                <span class="topic-group-icon">${group.groupIcon}</span>
+                <span>${group.groupName}</span>
+              </div>
+              <div class="topic-group-badge">${group.topicCount} ${group.topicCount === 1 ? 'тема' : 'тем'}</div>
+            </div>
+            <div class="topic-group-content" id="group${groupIndex}">
+              <p style="color: #666; margin-bottom: 15px;">${group.groupDescription}</p>
+              <div class="topics-grid">
+                ${group.topics.map(topic => `
+                  <div class="topic-card" onclick="toggleTopic(${topic.id})">
+                    <input type="checkbox" id="topic${topic.id}" onchange="event.stopPropagation()">
+                    <div class="topic-title">${topic.title}</div>
+                    <div class="topic-desc">${topic.description}</div>
+                    <div class="topic-meta">Цель: ${topic.goal}</div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      container.style.display = 'block';
+      container.style.gridTemplateColumns = '1fr'; // Одна колонка для групп
+    }
+
     function displayTopics(topics) {
       const grid = document.getElementById('topicsGrid');
       grid.innerHTML = topics.map(topic => `
@@ -509,6 +607,13 @@
           <div class="topic-meta">Тип: ${topic.contentType} • Цель: ${topic.goal}</div>
         </div>
       `).join('');
+      grid.style.display = 'grid';
+      grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(300px, 1fr))';
+    }
+
+    function toggleGroup(groupIndex) {
+      const content = document.getElementById(`group${groupIndex}`);
+      content.classList.toggle('collapsed');
     }
 
     function toggleTopic(id) {

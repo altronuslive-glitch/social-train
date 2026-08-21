@@ -58,7 +58,8 @@ router.post('/channel', async (req, res) => {
       channel,
       analyzedPostsCount: posts.length,
       brandCard,
-      topics,
+      topics: topics.topics, // все темы в плоском массиве
+      groups: topics.groups, // темы сгруппированные по типам
     });
 
   } catch (err) {
