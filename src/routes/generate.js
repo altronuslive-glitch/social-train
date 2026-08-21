@@ -9,6 +9,51 @@ import { generateImageAdvanced } from '../services/grok.js';
 const router = Router();
 
 /**
+ * POST /api/generate/image
+ * Генерирует одно изображение для поста.
+ * Body: {
+ *   imagePrompt: "...",
+ *   negativePrompt: "...",
+ *   aspectRatio: "1:1"
+ * }
+ */
+router.post('/image', async (req, res) => {
+  const { imagePrompt, negativePrompt, aspectRatio } = req.body;
+
+  if (!imagePrompt) {
+    return res.status(400).json({ error: 'Необходим imagePrompt' });
+  }
+
+  const grokApiKey = process.env.GROK_API_KEY;
+
+  if (!grokApiKey) {
+    return res.status(500).json({ error: 'GROK_API_KEY не настроен на сервере' });
+  }
+
+  try {
+    console.log(`🎨 Генерация изображения...`);
+
+    const imageUrl = await generateImageAdvanced({
+      prompt: imagePrompt,
+      negativePrompt: negativePrompt || '',
+      aspectRatio: aspectRatio || '1:1',
+      apiKey: grokApiKey,
+    });
+
+    console.log(`✅ Изображение сгенерировано`);
+
+    res.json({
+      success: true,
+      imageUrl,
+    });
+
+  } catch (err) {
+    console.error('Generate image error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/generate/images
  * Генерирует изображения для постов через Grok API.
  * Body: {

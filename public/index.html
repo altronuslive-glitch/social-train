@@ -276,6 +276,41 @@
     .post-title {
       font-weight: 600;
       color: #667eea;
+      flex: 1;
+    }
+
+    .post-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-icon {
+      background: white;
+      border: 2px solid #667eea;
+      color: #667eea;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-icon:hover {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-icon:active {
+      transform: scale(0.95);
+    }
+
+    .btn-icon.copied {
+      background: #48bb78;
+      border-color: #48bb78;
+      color: white;
     }
 
     .post-verdict {
@@ -283,6 +318,7 @@
       border-radius: 20px;
       font-size: 0.85rem;
       font-weight: 600;
+      display: none; /* Скрываем verdict */
     }
 
     .verdict-approved {
@@ -322,6 +358,69 @@
       max-width: 100%;
       border-radius: 8px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .image-placeholder {
+      width: 100%;
+      min-height: 300px;
+      background: #edf2f7;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .image-loading {
+      width: 60px;
+      height: 60px;
+      border: 4px solid #e0e0e0;
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    .btn-generate-image {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 15px;
+    }
+
+    .btn-generate-image:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-generate-image:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-download {
+      background: #48bb78;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: all 0.2s;
+    }
+
+    .btn-download:hover {
+      background: #38a169;
+      transform: translateY(-2px);
     }
 
     .error {
@@ -433,14 +532,6 @@
       <h2>Шаг 3: Сгенерированные посты</h2>
       <div class="stats" id="statsDisplay"></div>
       <div class="posts-list" id="postsList"></div>
-
-      <div style="margin-top: 20px;">
-        <div class="form-group">
-          <label for="grokApiKey">Grok API ключ (для генерации изображений):</label>
-          <input type="text" id="grokApiKey" placeholder="xai-...">
-        </div>
-        <button class="btn btn-secondary" onclick="generateImages()">Сгенерировать изображения</button>
-      </div>
     </div>
 
     <!-- Ошибки -->
@@ -690,10 +781,6 @@
           <div class="stat-value">${data.approvedCount}</div>
           <div class="stat-label">Одобрено</div>
         </div>
-        <div class="stat-item">
-          <div class="stat-value">${Math.round((data.approvedCount / data.postsCount) * 100)}%</div>
-          <div class="stat-label">Качество</div>
-        </div>
       `;
       document.getElementById('statsDisplay').innerHTML = html;
     }
@@ -703,19 +790,111 @@
         <div class="post-item" id="post${i}">
           <div class="post-header">
             <div class="post-title">${i + 1}. ${post.topicTitle}</div>
-            <div class="post-verdict ${post.artDirectorVerdict === 'APPROVED' ? 'verdict-approved' : 'verdict-rejected'}">
-              ${post.artDirectorVerdict}
+            <div class="post-actions">
+              <button class="btn-icon" onclick="copyText(${i})" id="copyBtn${i}">
+                📋 Копировать
+              </button>
             </div>
           </div>
-          <div class="post-text">${post.postText}</div>
+          <div class="post-text" id="postText${i}">${post.postText}</div>
           <details>
             <summary style="cursor: pointer; margin-bottom: 10px;">Промпт для изображения</summary>
             <div class="post-prompt">${post.imagePrompt}</div>
           </details>
+          <button class="btn-generate-image" onclick="generateSingleImage(${i})" id="generateBtn${i}">
+            🎨 Сгенерировать изображение
+          </button>
           <div class="post-image" id="postImage${i}"></div>
         </div>
       `).join('');
       document.getElementById('postsList').innerHTML = html;
+    }
+
+    async function copyText(index) {
+      const text = document.getElementById(`postText${index}`).textContent;
+      const btn = document.getElementById(`copyBtn${index}`);
+
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = '✅ Скопировано';
+        btn.classList.add('copied');
+
+        setTimeout(() => {
+          btn.textContent = '📋 Копировать';
+          btn.classList.remove('copied');
+        }, 2000);
+      } catch (err) {
+        alert('Ошибка копирования');
+      }
+    }
+
+    async function generateSingleImage(index) {
+      const post = currentData.posts[index];
+      const btn = document.getElementById(`generateBtn${index}`);
+      const imageContainer = document.getElementById(`postImage${index}`);
+
+      // Показываем загрузку
+      imageContainer.innerHTML = `
+        <div class="image-placeholder">
+          <div class="image-loading"></div>
+          <p style="color: #666;">Генерация изображения...</p>
+        </div>
+      `;
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Генерация...';
+
+      try {
+        const response = await fetch('/api/generate/image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imagePrompt: post.imagePrompt,
+            negativePrompt: post.negativePrompt,
+            aspectRatio: post.aspectRatio || '1:1'
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Ошибка генерации');
+        }
+
+        // Отображаем изображение
+        imageContainer.innerHTML = `
+          <img src="${data.imageUrl}" alt="Generated image" id="img${index}">
+          <br>
+          <button class="btn-download" onclick="downloadImage('${data.imageUrl}', ${index})">
+            ⬇️ Скачать изображение
+          </button>
+        `;
+
+        btn.textContent = '✅ Изображение готово';
+        setTimeout(() => {
+          btn.textContent = '🔄 Перегенерировать';
+          btn.disabled = false;
+        }, 2000);
+
+      } catch (error) {
+        imageContainer.innerHTML = `<p style="color: #e53e3e;">❌ Ошибка: ${error.message}</p>`;
+        btn.textContent = '🎨 Попробовать снова';
+        btn.disabled = false;
+      }
+    }
+
+    async function downloadImage(url, index) {
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `social-train-post-${index + 1}.jpg`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      } catch (error) {
+        alert('Ошибка скачивания: ' + error.message);
+      }
     }
 
     async function generateImages() {
