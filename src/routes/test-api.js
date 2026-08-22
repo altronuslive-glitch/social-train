@@ -63,6 +63,7 @@ router.get('/', async (req, res) => {
       systemPrompt: 'Отвечай кратко.',
       userPrompt: testPrompt,
       maxTokens: 50,
+      reasoningEffort: 'low', // это просто ping — рассуждать тут не над чем
     });
     results.tests.deepseek.status = 'success';
     results.tests.deepseek.response = response.trim();

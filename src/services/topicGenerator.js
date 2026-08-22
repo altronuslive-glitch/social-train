@@ -92,7 +92,6 @@ ${contentTypesStr}
     systemPrompt,
     userPrompt,
     maxTokens: 4000, // увеличиваем для группированного формата
-    temperature: 0.8,
   });
 
   // Улучшенная обработка JSON - иногда DeepSeek добавляет текст после JSON

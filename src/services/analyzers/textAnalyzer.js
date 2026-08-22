@@ -105,7 +105,6 @@ ${postsText}`;
     systemPrompt,
     userPrompt,
     maxTokens: 4000,
-    temperature: 0.3, // низкая температура для более точного анализа
   });
 
   const jsonMatch = textAnalysisRaw.match(/\{[\s\S]*\}/);

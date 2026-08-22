@@ -154,7 +154,6 @@ export async function analyzeImageContent(posts) {
       systemPrompt: 'Ты — эксперт по визуальному дизайну, брендингу и фотографии с 15-летним опытом. Анализируешь визуальный контент и создаёшь детальные отчёты о стиле.',
       content,
       maxTokens: 3000,
-      temperature: 0.3,
     });
 
     const jsonMatch = visualAnalysisRaw.match(/\{[\s\S]*\}/);

@@ -110,7 +110,6 @@ ${JSON.stringify(imageAnalysis, null, 2)}
     systemPrompt,
     userPrompt,
     maxTokens: 4000,
-    temperature: 0.4,
   });
 
   const jsonMatch = brandCardRaw.match(/\{[\s\S]*\}/);
