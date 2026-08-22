@@ -1,82 +1,116 @@
 /**
  * Grok API Client — для генерации изображений через xAI Grok.
  * Документация: https://docs.x.ai/api
+ *
+ * Формат запроса (проверен на живом API):
+ *   POST https://api.x.ai/v1/images/generations
+ *   { model, prompt, n, aspect_ratio, resolution, quality, response_format }
+ *
+ * ВАЖНО: xAI НЕ принимает параметр `size` (как у DALL-E) — вернёт
+ * 400 "Argument not supported: size". Размер задаётся через
+ * `aspect_ratio` + `resolution`.
  */
 
-import OpenAI from 'openai';
+const XAI_IMAGES_URL = 'https://api.x.ai/v1/images/generations';
+const XAI_MODELS_URL = 'https://api.x.ai/v1/models';
+
+/** Модель по умолчанию. Альтернативы: grok-imagine-image-2.0, grok-imagine-image-quality */
+const DEFAULT_MODEL = 'grok-imagine-image';
+
+/** Соотношения сторон, которые принимает xAI. */
+const SUPPORTED_ASPECT_RATIOS = new Set([
+  '1:1', '3:4', '4:3', '9:16', '16:9', '2:3', '3:2',
+  '9:19.5', '19.5:9', '9:20', '20:9', '1:2', '2:1', '21:9', '5:2', 'auto',
+]);
+
+/** Соотношения из UI, которых нет у xAI → ближайший поддерживаемый аналог. */
+const ASPECT_RATIO_FALLBACK = {
+  '4:5': '3:4',
+  '5:4': '4:3',
+};
+
+/** Максимальная длина промпта у image-моделей xAI. */
+const MAX_PROMPT_LENGTH = 8000;
+
+/**
+ * Приводит соотношение сторон к значению, которое понимает xAI.
+ * @param {string} aspectRatio
+ * @returns {string}
+ */
+function normalizeAspectRatio(aspectRatio) {
+  if (!aspectRatio) return '1:1';
+  if (SUPPORTED_ASPECT_RATIOS.has(aspectRatio)) return aspectRatio;
+  return ASPECT_RATIO_FALLBACK[aspectRatio] || '1:1';
+}
 
 /**
  * Генерирует изображение через Grok API.
  * @param {object} params
  * @param {string} params.prompt — промпт для генерации
  * @param {string} params.apiKey — Grok API ключ (xai-...)
- * @param {string} [params.model] — модель (по умолчанию grok-vision или другая)
- * @param {string} [params.size] — размер изображения (1024x1024, 1024x1792, 1792x1024)
- * @param {number} [params.n] — количество изображений (1-4)
+ * @param {string} [params.model] — модель (по умолчанию grok-imagine-image)
+ * @param {string} [params.aspectRatio] — соотношение сторон (1:1, 16:9, 9:16, ...)
+ * @param {string} [params.resolution] — разрешение: 1k | 2k
+ * @param {string} [params.quality] — качество: low | medium | high
+ * @param {number} [params.n] — количество изображений (1-10)
  * @returns {Promise<string[]>} массив URL сгенерированных изображений
  */
 export async function generateImage({
   prompt,
   apiKey,
-  model = 'grok-2-vision-1212', // предполагаемое имя модели
-  size = '1024x1024',
+  model = DEFAULT_MODEL,
+  aspectRatio = '1:1',
+  resolution = '1k',
+  quality = 'medium',
   n = 1,
 }) {
   if (!apiKey) {
     throw new Error('Grok API key не предоставлен');
   }
 
-  // Создаём клиент OpenAI, но с baseURL для Grok API
-  const client = new OpenAI({
-    apiKey,
-    baseURL: 'https://api.x.ai/v1', // предполагаемый endpoint
+  if (!prompt) {
+    throw new Error('Промпт для генерации изображения пустой');
+  }
+
+  const response = await fetch(XAI_IMAGES_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      prompt: prompt.slice(0, MAX_PROMPT_LENGTH),
+      n,
+      aspect_ratio: normalizeAspectRatio(aspectRatio),
+      resolution,
+      quality,
+      response_format: 'url',
+    }),
   });
 
-  try {
-    // Используем Chat Completions API (как у OpenAI DALL-E)
-    // Если у Grok есть отдельный images endpoint, нужно будет адаптировать
-    const response = await client.images.generate({
-      model,
-      prompt,
-      n,
-      size,
-    });
+  const rawBody = await response.text();
 
-    return response.data.map(img => img.url);
-  } catch (error) {
-    // Если images endpoint не существует, пробуем через chat
-    console.warn('Grok images API недоступен, пробуем через chat:', error.message);
-
+  if (!response.ok) {
+    // xAI отдаёт ошибки либо как JSON {code, error}, либо как plain text
+    let message = rawBody;
     try {
-      const chatResponse = await client.chat.completions.create({
-        model,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an image generation assistant. Generate images based on user prompts.',
-          },
-          {
-            role: 'user',
-            content: `Generate an image: ${prompt}`,
-          },
-        ],
-      });
-
-      // Извлекаем URL из ответа (формат зависит от API Grok)
-      const content = chatResponse.choices[0]?.message?.content;
-
-      // Пытаемся найти URL в ответе
-      const urlMatch = content?.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp)/gi);
-
-      if (urlMatch) {
-        return urlMatch;
-      }
-
-      throw new Error('Не удалось извлечь URL изображения из ответа Grok');
-    } catch (chatError) {
-      throw new Error(`Grok API error: ${chatError.message}`);
+      const parsed = JSON.parse(rawBody);
+      message = parsed.error?.message || parsed.error || parsed.message || rawBody;
+    } catch {
+      // оставляем текст как есть
     }
+    throw new Error(`Grok API error: ${response.status} ${message}`);
   }
+
+  const data = JSON.parse(rawBody);
+  const urls = (data.data || []).map(img => img.url).filter(Boolean);
+
+  if (urls.length === 0) {
+    throw new Error('Grok API вернул ответ без URL изображений');
+  }
+
+  return urls;
 }
 
 /**
@@ -86,6 +120,7 @@ export async function generateImage({
  * @param {string} [params.negativePrompt] — negative prompt (что исключить)
  * @param {string} params.apiKey — Grok API ключ
  * @param {string} [params.aspectRatio] — соотношение сторон (1:1, 16:9, 9:16, 4:5)
+ * @param {string} [params.model] — модель xAI
  * @returns {Promise<string>} URL сгенерированного изображения
  */
 export async function generateImageAdvanced({
@@ -93,19 +128,9 @@ export async function generateImageAdvanced({
   negativePrompt,
   apiKey,
   aspectRatio = '1:1',
+  model = DEFAULT_MODEL,
 }) {
-  // Конвертируем aspect ratio в размер
-  const sizeMap = {
-    '1:1': '1024x1024',
-    '16:9': '1792x1024',
-    '9:16': '1024x1792',
-    '4:5': '1024x1280',
-    '5:4': '1280x1024',
-  };
-
-  const size = sizeMap[aspectRatio] || '1024x1024';
-
-  // Если есть negative prompt, добавляем его к основному промпту
+  // У xAI нет отдельного поля negative prompt — дописываем его в основной промпт
   const fullPrompt = negativePrompt
     ? `${prompt}\n\nAvoid: ${negativePrompt}`
     : prompt;
@@ -113,7 +138,8 @@ export async function generateImageAdvanced({
   const urls = await generateImage({
     prompt: fullPrompt,
     apiKey,
-    size,
+    model,
+    aspectRatio,
     n: 1,
   });
 
@@ -126,15 +152,14 @@ export async function generateImageAdvanced({
  * @returns {Promise<boolean>} true если ключ валидный
  */
 export async function testGrokApiKey(apiKey) {
+  if (!apiKey) return false;
+
   try {
-    const client = new OpenAI({
-      apiKey,
-      baseURL: 'https://api.x.ai/v1',
+    const response = await fetch(XAI_MODELS_URL, {
+      headers: { 'Authorization': `Bearer ${apiKey}` },
     });
 
-    // Пробуем простой запрос
-    await client.models.list();
-    return true;
+    return response.ok;
   } catch (error) {
     console.error('Grok API key test failed:', error.message);
     return false;
