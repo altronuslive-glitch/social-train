@@ -16,6 +16,7 @@
  */
 
 import OpenAI from 'openai';
+import { fetchImage } from './imageFetch.js';
 
 /** Доступные модели DeepSeek. */
 export const MODELS = {
@@ -185,9 +186,6 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 /** Суммарный бюджет на все картинки в запросе, байт (до кодирования в base64). */
 const MAX_TOTAL_IMAGE_BYTES = 12 * 1024 * 1024;
 
-/** Таймаут на скачивание одной картинки, мс. */
-const IMAGE_FETCH_TIMEOUT_MS = 15000;
-
 /**
  * Заменяет блоки image_url с внешними ссылками на data:base64.
  * Картинки, которые не удалось скачать, выбрасываются из запроса,
@@ -245,40 +243,12 @@ async function inlineImages(content) {
  * @returns {Promise<{dataUrl: string, bytes: number}|null>} null, если скачать не удалось
  */
 async function fetchImageAsDataUrl(url) {
-  try {
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
-      headers: {
-        // Некоторые CDN отдают 403 без правдоподобного User-Agent
-        'User-Agent': 'Mozilla/5.0 (compatible; social-train/1.0)',
-      },
-    });
+  const image = await fetchImage(url, { maxBytes: MAX_IMAGE_BYTES });
 
-    if (!response.ok) {
-      console.warn(`⚠️  Не удалось скачать изображение (${response.status}): ${url}`);
-      return null;
-    }
+  if (!image) return null;
 
-    const buffer = Buffer.from(await response.arrayBuffer());
-
-    if (buffer.length === 0) {
-      return null;
-    }
-
-    if (buffer.length > MAX_IMAGE_BYTES) {
-      console.warn(`⚠️  Изображение слишком большое (${Math.round(buffer.length / 1024)} КБ): ${url}`);
-      return null;
-    }
-
-    const contentType = response.headers.get('content-type');
-    const mimeType = contentType?.startsWith('image/') ? contentType.split(';')[0] : 'image/jpeg';
-
-    return {
-      dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`,
-      bytes: buffer.length,
-    };
-  } catch (error) {
-    console.warn(`⚠️  Ошибка загрузки изображения ${url}: ${error.message}`);
-    return null;
-  }
+  return {
+    dataUrl: `data:${image.mimeType};base64,${image.buffer.toString('base64')}`,
+    bytes: image.buffer.length,
+  };
 }

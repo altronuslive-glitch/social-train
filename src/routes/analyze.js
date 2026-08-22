@@ -6,19 +6,39 @@
 import { Router } from 'express';
 import { parseTelegramChannel } from '../services/telegramParser.js';
 import { analyzeChannelAndGenerateTopics, generatePostsByTopics } from '../services/pipeline.js';
+import { requireAuth } from '../middleware/auth.js';
+import { createChannel } from '../db/repositories.js';
 
 const router = Router();
 
+// Генерация доступна только из личного кабинета
+router.use(requireAuth);
+
+/** Сколько постов канала анализируем — всегда одинаково, настройки нет. */
+const ANALYZED_POSTS_COUNT = 30;
+
+/**
+ * Приводит ввод пользователя к чистому имени канала:
+ * "https://t.me/cats/" и "@cats" одинаково становятся "cats".
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeHandle(value) {
+  return value
+    .trim()
+    .replace(/^https?:\/\/t\.me\//i, '')
+    .replace(/^@/, '')
+    .replace(/\/$/, '');
+}
+
 /**
  * POST /api/analyze/channel
- * Анализирует канал и возвращает карточку бренда + 20 предложенных тем.
- * Body: {
- *   channel: "cvetidnya",
- *   postsCount: 30
- * }
+ * Анализирует канал, сохраняет результат в кабинет пользователя
+ * и возвращает карточку бренда + 20 предложенных тем.
+ * Body: { channel: "cvetidnya" }
  */
 router.post('/channel', async (req, res) => {
-  const { channel, postsCount = 30 } = req.body;
+  const { channel } = req.body;
 
   if (!channel) {
     return res.status(400).json({ error: 'Поле channel обязательно' });
@@ -29,7 +49,7 @@ router.post('/channel', async (req, res) => {
 
     // Шаг 1: Парсим Telegram-канал
     console.log('📥 [1/4] Парсинг постов из Telegram...');
-    const posts = await parseTelegramChannel({ channel, limit: postsCount });
+    const posts = await parseTelegramChannel({ channel, limit: ANALYZED_POSTS_COUNT });
 
     if (posts.length < 5) {
       return res.status(422).json({
@@ -51,10 +71,21 @@ router.post('/channel', async (req, res) => {
       }
     });
 
-    console.log('\n✅ Анализ завершён!');
+    // Сохраняем результат в кабинет — дальше пользователь работает с ним оттуда
+    const channelId = createChannel(req.user.id, {
+      handle: normalizeHandle(channel),
+      title: brandCard?.brand?.niche || channel,
+      brandCard,
+      topics: topics.topics,
+      groups: topics.groups,
+      analyzedPostsCount: posts.length,
+    });
+
+    console.log(`\n✅ Анализ завершён! Канал сохранён в кабинет (id ${channelId})`);
 
     res.json({
       success: true,
+      channelId,
       channel,
       analyzedPostsCount: posts.length,
       brandCard,

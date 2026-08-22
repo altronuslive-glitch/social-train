@@ -5,8 +5,12 @@
 
 import { Router } from 'express';
 import { generateImageAdvanced } from '../services/grok.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
+
+// Генерация доступна только из личного кабинета
+router.use(requireAuth);
 
 /**
  * POST /api/generate/image
@@ -56,20 +60,22 @@ router.post('/image', async (req, res) => {
 /**
  * POST /api/generate/images
  * Генерирует изображения для постов через Grok API.
+ * Ключ берётся из переменных окружения — гонять его с фронтенда незачем.
  * Body: {
- *   posts: [{imagePrompt, negativePrompt, aspectRatio, ...}],
- *   grokApiKey: "xai-..."
+ *   posts: [{imagePrompt, negativePrompt, aspectRatio, ...}]
  * }
  */
 router.post('/images', async (req, res) => {
-  const { posts, grokApiKey } = req.body;
+  const { posts } = req.body;
 
   if (!posts || !Array.isArray(posts) || posts.length === 0) {
     return res.status(400).json({ error: 'Необходим массив posts с промптами' });
   }
 
+  const grokApiKey = process.env.GROK_API_KEY;
+
   if (!grokApiKey) {
-    return res.status(400).json({ error: 'Необходим grokApiKey для генерации изображений' });
+    return res.status(500).json({ error: 'GROK_API_KEY не настроен на сервере' });
   }
 
   try {
