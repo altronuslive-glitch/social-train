@@ -4,7 +4,7 @@
  * (совместим с Midjourney, DALL-E 3, Flux, Stable Diffusion).
  */
 
-import { callDeepSeek } from '../deepseek.js';
+import { callDeepSeek, MODELS } from '../deepseek.js';
 
 /**
  * Превращает бриф в готовый промпт для нейросети.
@@ -58,6 +58,10 @@ export async function generateImagePrompt({ imageBrief, profile, target = 'flux'
   const raw = await callDeepSeek({
     systemPrompt,
     userPrompt,
+    // Задача — переложить готовый бриф в англоязычный промпт по заданному
+    // шаблону. Рассуждающая Pro тратила на это отдельный долгий раунд,
+    // хотя ничего нового не решает.
+    model: MODELS.FLASH,
     maxTokens: 1500,
   });
 

@@ -4,35 +4,70 @@
 
 /**
  * Поля карточки бренда, доступные для правки.
- * type: 'text' — однострочное поле, 'list' — массив, по одному пункту на строку.
- * Именно эти поля попадают в промпты генерации, поэтому их и даём менять.
+ *
+ * type: 'text' — обычное поле, 'list' — массив, по одному пункту на строку.
+ * secondary: true — поле уезжает в свёрнутый блок «Остальные поля».
+ *
+ * Наверху оставлены пять полей, которые сильнее всего меняют результат
+ * генерации: раньше карточка разворачивалась на два экрана и найти в ней
+ * нужное было тяжело. Остальное никуда не делось — просто убрано под
+ * раскрывающийся блок и правится там же.
  */
 const BRAND_FIELDS = [
-  { path: 'brand.name',                    label: 'Название',                rows: 1 },
-  { path: 'brand.niche',                   label: 'Ниша',                    rows: 1 },
-  { path: 'brand.description',             label: 'Описание',                rows: 3 },
-  { path: 'brand.uniqueness',              label: 'Уникальность',            rows: 3 },
-  { path: 'brand.positioning',             label: 'Позиционирование',        rows: 2 },
+  {
+    path: 'brand.niche',
+    label: 'Ниша',
+    hint: 'Сфера канала в двух словах. Задаёт словарь и уместные примеры.',
+    rows: 1,
+  },
+  {
+    path: 'brand.description',
+    label: 'О чём канал',
+    hint: 'Что здесь публикуют и зачем читателю подписываться.',
+    rows: 3,
+  },
+  {
+    path: 'toneOfVoice.summary',
+    label: 'Голос бренда',
+    hint: 'Как канал разговаривает: интонация, дистанция, степень формальности.',
+    rows: 4,
+  },
+  {
+    path: 'audience.portrait',
+    label: 'Аудитория',
+    hint: 'Кто читает: возраст, занятия, что для этих людей важно.',
+    rows: 3,
+  },
+  {
+    path: 'contentGuidelines.dontList',
+    label: 'Чего избегать',
+    hint: 'По пункту на строку. Самый быстрый способ убрать то, что не нравится в постах.',
+    rows: 4,
+    type: 'list',
+  },
 
-  { path: 'toneOfVoice.summary',           label: 'Tone of voice',           rows: 3 },
-  { path: 'toneOfVoice.characteristics',   label: 'Характеристики голоса',   rows: 3, type: 'list' },
-  { path: 'toneOfVoice.language',          label: 'Язык',                    rows: 2 },
-  { path: 'toneOfVoice.emotionality',      label: 'Эмоциональность',         rows: 2 },
-  { path: 'toneOfVoice.humor',             label: 'Юмор',                    rows: 2 },
-  { path: 'toneOfVoice.appeals',           label: 'Обращение к аудитории',   rows: 2 },
-  { path: 'toneOfVoice.forbiddenTone',     label: 'Чего избегать в тоне',    rows: 2 },
+  // Ниже — подробности из анализа. Влияют на генерацию так же, но менять
+  // их приходится редко, поэтому по умолчанию свёрнуты.
+  { path: 'brand.name',                    label: 'Название',                rows: 1, secondary: true },
+  { path: 'brand.uniqueness',              label: 'Уникальность',            rows: 3, secondary: true },
+  { path: 'brand.positioning',             label: 'Позиционирование',        rows: 2, secondary: true },
 
-  { path: 'audience.portrait',             label: 'Портрет аудитории',       rows: 3 },
-  { path: 'audience.painPoints',           label: 'Боли аудитории',          rows: 3, type: 'list' },
-  { path: 'audience.desires',              label: 'Желания аудитории',       rows: 3, type: 'list' },
-  { path: 'audience.expertiseLevel',       label: 'Уровень экспертизы',      rows: 1 },
+  { path: 'toneOfVoice.characteristics',   label: 'Характеристики голоса',   rows: 3, type: 'list', secondary: true },
+  { path: 'toneOfVoice.language',          label: 'Язык',                    rows: 2, secondary: true },
+  { path: 'toneOfVoice.emotionality',      label: 'Эмоциональность',         rows: 2, secondary: true },
+  { path: 'toneOfVoice.humor',             label: 'Юмор',                    rows: 2, secondary: true },
+  { path: 'toneOfVoice.appeals',           label: 'Обращение к аудитории',   rows: 2, secondary: true },
+  { path: 'toneOfVoice.forbiddenTone',     label: 'Чего избегать в тоне',    rows: 2, secondary: true },
 
-  { path: 'visualIdentity.summary',        label: 'Визуальный стиль',        rows: 3 },
-  { path: 'visualIdentity.mood',           label: 'Настроение визуала',      rows: 2 },
+  { path: 'audience.painPoints',           label: 'Боли аудитории',          rows: 3, type: 'list', secondary: true },
+  { path: 'audience.desires',              label: 'Желания аудитории',       rows: 3, type: 'list', secondary: true },
+  { path: 'audience.expertiseLevel',       label: 'Уровень экспертизы',      rows: 1, secondary: true },
 
-  { path: 'contentGuidelines.doList',      label: 'Что делать',              rows: 4, type: 'list' },
-  { path: 'contentGuidelines.dontList',    label: 'Чего не делать',          rows: 4, type: 'list' },
-  { path: 'contentGuidelines.textRules',   label: 'Правила оформления',      rows: 4, type: 'list' },
+  { path: 'visualIdentity.summary',        label: 'Визуальный стиль',        rows: 3, secondary: true },
+  { path: 'visualIdentity.mood',           label: 'Настроение визуала',      rows: 2, secondary: true },
+
+  { path: 'contentGuidelines.doList',      label: 'Что делать',              rows: 4, type: 'list', secondary: true },
+  { path: 'contentGuidelines.textRules',   label: 'Правила оформления',      rows: 4, type: 'list', secondary: true },
 ];
 
 /** Достаёт значение по пути вида 'brand.niche'. */
@@ -90,21 +125,40 @@ function renderBrandCardEditor(brandCard) {
     return;
   }
 
-  container.innerHTML = BRAND_FIELDS.map((field, index) => {
-    const raw = getByPath(brandCard, field.path);
+  // Индекс в общем массиве — это же id поля, поэтому считаем его до фильтрации:
+  // сохранение ищет textarea по нему и не должно зависеть от разбиения
+  const fields = BRAND_FIELDS.map((field, index) => ({ field, index }));
+  const primary = fields.filter(({ field }) => !field.secondary);
+  const secondary = fields.filter(({ field }) => field.secondary);
 
-    const value = field.type === 'list'
-      ? (Array.isArray(raw) ? raw.join('\n') : (raw ?? ''))
-      : (raw ?? '');
+  const renderGroup = (group) => group
+    .map(({ field, index }) => brandFieldMarkup(brandCard, field, index))
+    .join('');
 
-    return `
-      <div class="brand-field">
-        <label for="brandField${index}">${escapeHtml(field.label)}</label>
-        <textarea id="brandField${index}" rows="${field.rows}"
-                  data-path="${field.path}" data-type="${field.type || 'text'}">${escapeHtml(value)}</textarea>
-      </div>
-    `;
-  }).join('');
+  container.innerHTML = renderGroup(primary) + (secondary.length === 0 ? '' : `
+    <details class="brand-extra">
+      <summary>Остальные поля карточки (${secondary.length})</summary>
+      <div class="brand-extra-body">${renderGroup(secondary)}</div>
+    </details>
+  `);
+}
+
+/** Разметка одного поля карточки. */
+function brandFieldMarkup(brandCard, field, index) {
+  const raw = getByPath(brandCard, field.path);
+
+  const value = field.type === 'list'
+    ? (Array.isArray(raw) ? raw.join('\n') : (raw ?? ''))
+    : (raw ?? '');
+
+  return `
+    <div class="brand-field">
+      <label for="brandField${index}">${escapeHtml(field.label)}</label>
+      ${field.hint ? `<p class="brand-hint">${escapeHtml(field.hint)}</p>` : ''}
+      <textarea id="brandField${index}" rows="${field.rows}"
+                data-path="${field.path}" data-type="${field.type || 'text'}">${escapeHtml(value)}</textarea>
+    </div>
+  `;
 }
 
 /** Собирает карточку из формы и сохраняет её. */

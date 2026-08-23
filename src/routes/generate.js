@@ -1,6 +1,11 @@
 /**
- * Route: /api/generate/images
- * Генерация изображений через Grok API
+ * Route: /api/generate
+ * Генерация изображений через Grok API — по одной штуке, по явному запросу.
+ *
+ * Пакетной генерации здесь намеренно нет: картинки делаются только вручную
+ * для конкретного поста, уже после того как пользователь посмотрел тексты.
+ * Интерфейс для этого ходит в POST /api/posts/:id/image — тот вдобавок
+ * сохраняет файл у нас и привязывает его к посту.
  */
 
 import { Router } from 'express';
@@ -53,90 +58,6 @@ router.post('/image', async (req, res) => {
 
   } catch (err) {
     console.error('Generate image error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * POST /api/generate/images
- * Генерирует изображения для постов через Grok API.
- * Ключ берётся из переменных окружения — гонять его с фронтенда незачем.
- * Body: {
- *   posts: [{imagePrompt, negativePrompt, aspectRatio, ...}]
- * }
- */
-router.post('/images', async (req, res) => {
-  const { posts } = req.body;
-
-  if (!posts || !Array.isArray(posts) || posts.length === 0) {
-    return res.status(400).json({ error: 'Необходим массив posts с промптами' });
-  }
-
-  const grokApiKey = process.env.GROK_API_KEY;
-
-  if (!grokApiKey) {
-    return res.status(500).json({ error: 'GROK_API_KEY не настроен на сервере' });
-  }
-
-  try {
-    console.log(`\n🎨 Генерация изображений для ${posts.length} постов...`);
-
-    const results = [];
-
-    for (let i = 0; i < posts.length; i++) {
-      const post = posts[i];
-      console.log(`  🖼️  Генерация ${i + 1}/${posts.length}: ${post.topicTitle || 'Пост ' + (i + 1)}`);
-
-      try {
-        const imageUrl = await generateImageAdvanced({
-          prompt: post.imagePrompt,
-          negativePrompt: post.negativePrompt,
-          aspectRatio: post.aspectRatio || '1:1',
-          apiKey: grokApiKey,
-        });
-
-        results.push({
-          postIndex: i,
-          topicId: post.topicId,
-          topicTitle: post.topicTitle,
-          imageUrl,
-          status: 'success',
-          prompt: post.imagePrompt,
-        });
-
-        console.log(`    ✅ Готово`);
-      } catch (error) {
-        console.error(`    ❌ Ошибка: ${error.message}`);
-
-        results.push({
-          postIndex: i,
-          topicId: post.topicId,
-          topicTitle: post.topicTitle,
-          imageUrl: null,
-          status: 'error',
-          error: error.message,
-          prompt: post.imagePrompt,
-        });
-      }
-
-      // Небольшая пауза между запросами
-      if (i < posts.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-
-    const successCount = results.filter(r => r.status === 'success').length;
-    console.log(`\n✅ Генерация завершена: ${successCount}/${posts.length} успешно`);
-
-    res.json({
-      success: true,
-      total: posts.length,
-      successCount,
-      results,
-    });
-
-  } catch (err) {
-    console.error('Generate images error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

@@ -4,7 +4,7 @@
  * Без сантиментов: либо APPROVED, либо REJECTED с конкретными замечаниями.
  */
 
-import { callDeepSeek } from '../deepseek.js';
+import { callDeepSeek, EFFORT } from '../deepseek.js';
 
 /**
  * Проверяет пост и промпт. Возвращает вердикт.
@@ -82,6 +82,9 @@ ${imageResult.negativePrompt}
     systemPrompt,
     userPrompt,
     maxTokens: 1500,
+    // Проверка по чеклисту: рассуждения тут осмысленны, но high был
+    // перебором — вердикт выносится по явно перечисленным критериям.
+    reasoningEffort: EFFORT.LOW,
   });
 
   // Находим первый JSON объект по скобкам

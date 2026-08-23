@@ -23,6 +23,14 @@ import { generateTopics } from './topicGenerator.js';
 const MAX_RETRIES = 2;
 
 /**
+ * Сколько постов генерируем одновременно.
+ * Каждый пост — это цепочка из трёх вызовов модели, и по очереди время
+ * складывалось линейно. Пачка по четыре сжимает его почти до времени
+ * одного поста, не заваливая API десятком параллельных запросов.
+ */
+const POSTS_BATCH_SIZE = 4;
+
+/**
  * Анализирует канал и формирует карточку бренда с темами.
  * @param {object[]} posts — массив постов из парсера
  * @param {function} [onProgress] — колбэк прогресса
@@ -85,18 +93,31 @@ export async function analyzeChannelAndGenerateTopics(posts, onProgress) {
  * @returns {Promise<PostResult[]>}
  */
 export async function generatePostsByTopics(brandCard, selectedTopics, onProgress) {
-  console.log(`\n🤖 Этап 4: Генерация ${selectedTopics.length} постов...`);
+  const total = selectedTopics.length;
+  console.log(`\n🤖 Этап 4: Генерация ${total} постов (по ${POSTS_BATCH_SIZE} параллельно)...`);
 
   const results = [];
+  let completed = 0;
 
-  for (let i = 0; i < selectedTopics.length; i++) {
-    const topic = selectedTopics[i];
-    console.log(`\n  ✍️  Пост ${i + 1}/${selectedTopics.length}: ${topic.title}`);
+  for (let start = 0; start < total; start += POSTS_BATCH_SIZE) {
+    const batch = selectedTopics.slice(start, start + POSTS_BATCH_SIZE);
 
-    const postResult = await processSinglePostFromTopic(brandCard, topic, i + 1);
-    results.push(postResult);
+    const batchResults = await Promise.all(batch.map(async (topic, offset) => {
+      const postNumber = start + offset + 1;
+      console.log(`  ✍️  Пост ${postNumber}/${total}: ${topic.title}`);
 
-    if (onProgress) onProgress({ step: 'post_generated', index: i + 1, total: selectedTopics.length, post: postResult });
+      const postResult = await processSinglePostFromTopic(brandCard, topic, postNumber);
+
+      // Посты в пачке финишируют вразнобой, поэтому в прогресс идёт
+      // счётчик готовых, а не номер поста — иначе полоса скакала бы назад
+      completed++;
+      if (onProgress) onProgress({ step: 'post_generated', index: completed, total, post: postResult });
+
+      return postResult;
+    }));
+
+    // Порядок результатов держим по темам, как их выбрал пользователь
+    results.push(...batchResults);
   }
 
   return results;

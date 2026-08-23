@@ -4,7 +4,15 @@
  * детальный документ о визуальном стиле, типах, категориях и методах применения.
  */
 
-import { callDeepSeekVision } from '../deepseek.js';
+import { callDeepSeekVision, EFFORT } from '../deepseek.js';
+
+/**
+ * Сколько картинок отправляем на разбор.
+ * Картинки — самая тяжёлая часть запроса и по времени скачивания, и по
+ * объёму на входе модели, а стиль канала по десяти кадрам читается не
+ * хуже, чем по двадцати.
+ */
+const MAX_ANALYZED_IMAGES = 10;
 
 /**
  * Анализирует визуальное содержимое постов.
@@ -16,7 +24,7 @@ export async function analyzeImageContent(posts) {
   const postsWithImages = posts
     .filter(p => p.imageUrls && p.imageUrls.length > 0)
     .sort((a, b) => b.views - a.views)
-    .slice(0, 20); // берём топ-20 постов с картинками
+    .slice(0, MAX_ANALYZED_IMAGES);
 
   if (postsWithImages.length === 0) {
     return {
@@ -138,7 +146,7 @@ export async function analyzeImageContent(posts) {
     },
   ];
 
-  // Добавляем изображения (максимум 20)
+  // Добавляем изображения
   for (const post of postsWithImages) {
     const imageUrl = post.imageUrls[0]; // берём первую картинку
     content.push({
@@ -154,6 +162,9 @@ export async function analyzeImageContent(posts) {
       systemPrompt: 'Ты — эксперт по визуальному дизайну, брендингу и фотографии с 15-летним опытом. Анализируешь визуальный контент и создаёшь детальные отчёты о стиле.',
       content,
       maxTokens: 3000,
+      // Описание того, что видно на картинках, — задача наблюдения, а не
+      // рассуждения. На high модель подолгу обдумывала очевидное.
+      reasoningEffort: EFFORT.LOW,
     });
 
     const jsonMatch = visualAnalysisRaw.match(/\{[\s\S]*\}/);

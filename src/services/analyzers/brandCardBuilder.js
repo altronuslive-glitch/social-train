@@ -4,7 +4,7 @@
  * с типами постов, визуальными рекомендациями и руководством для генерации контента.
  */
 
-import { callDeepSeek } from '../deepseek.js';
+import { callDeepSeek, EFFORT } from '../deepseek.js';
 
 /**
  * Формирует карточку бренда на основе текстового и визуального анализа.
@@ -110,6 +110,10 @@ ${JSON.stringify(imageAnalysis, null, 2)}
     systemPrompt,
     userPrompt,
     maxTokens: 4000,
+    // Оба анализа уже сделаны — здесь идёт переупаковка готовых выводов
+    // в единую структуру. Глубокие рассуждения на этом почти ничего не
+    // добавляют, а стоят отдельного долгого раунда в середине цепочки.
+    reasoningEffort: EFFORT.LOW,
   });
 
   const jsonMatch = brandCardRaw.match(/\{[\s\S]*\}/);

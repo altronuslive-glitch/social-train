@@ -696,26 +696,50 @@ input[type="password"]:focus {
 
 /* ─────────────────────────── Экран канала ─────────────────────────── */
 
+/*
+ * На экране канала полосе с карточкой бренда нужно больше места, чем даёт
+ * общая ширина в 1200px: в узкой колонке текст переносился каждые несколько
+ * слов. Остальные экраны (вход, список каналов) остаются прежней ширины.
+ */
+body:has(#channelView:not(.hidden)) .container {
+  max-width: 1440px;
+}
+
 .channel-layout {
   display: grid;
-  grid-template-columns: minmax(300px, 380px) 1fr;
+  grid-template-columns: minmax(380px, 520px) 1fr;
   gap: 30px;
   align-items: start;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .channel-layout {
     grid-template-columns: 1fr;
   }
+
+  /* В одну колонку карточка идёт обычным потоком: прилипание и своя
+     прокрутка тут только зажали бы её в узкую полосу посреди страницы */
+  .channel-sidebar {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
 }
 
+/*
+ * Прокрутка внутри колонки: раскрытый блок «Остальные поля» выше экрана,
+ * а прилипшая колонка без своей прокрутки обрезала бы низ формы вместе
+ * с кнопкой сохранения.
+ */
 .channel-sidebar {
   position: sticky;
   top: 20px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
 }
 
 .brand-field {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .brand-field label {
@@ -726,9 +750,44 @@ input[type="password"]:focus {
   margin-bottom: 6px;
 }
 
+.brand-hint {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #8a94a6;
+  margin: 0 0 8px;
+}
+
+.brand-extra {
+  border-top: 1px solid #e8ecf1;
+  margin: 4px 0 20px;
+  padding-top: 14px;
+}
+
+.brand-extra > summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #667eea;
+  list-style: none;
+  user-select: none;
+}
+
+.brand-extra > summary::before {
+  content: '▸ ';
+  display: inline-block;
+  transition: transform 0.15s;
+}
+
+.brand-extra[open] > summary::before {
+  content: '▾ ';
+}
+
+.brand-extra-body {
+  margin-top: 16px;
+}
+
 .brand-field textarea {
   width: 100%;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
   font-family: inherit;

@@ -190,38 +190,40 @@ const MAX_TOTAL_IMAGE_BYTES = 12 * 1024 * 1024;
  * Заменяет блоки image_url с внешними ссылками на data:base64.
  * Картинки, которые не удалось скачать, выбрасываются из запроса,
  * чтобы одна битая ссылка не роняла весь анализ.
+ *
+ * Скачивание идёт параллельно: по очереди каждая медленная или битая
+ * ссылка задерживала все следующие на свой таймаут, и десяток картинок
+ * в худшем случае занимал минуты. Общий бюджет по размеру применяется
+ * после загрузки, в исходном порядке блоков.
+ *
  * @param {array} content — исходные блоки
  * @returns {Promise<array>} блоки, готовые к отправке
  */
 async function inlineImages(content) {
   if (!Array.isArray(content)) return content;
 
-  const prepared = [];
-  let totalBytes = 0;
-  let skipped = 0;
-
-  for (const block of content) {
-    if (block?.type !== 'image_url') {
-      prepared.push(block);
-      continue;
-    }
+  const downloads = await Promise.all(content.map(async (block) => {
+    if (block?.type !== 'image_url') return { block };
 
     const url = block.image_url?.url;
 
     // Уже base64 — оставляем как есть
-    if (!url || url.startsWith('data:')) {
+    if (!url || url.startsWith('data:')) return { block };
+
+    return { block, image: await fetchImageAsDataUrl(url) };
+  }));
+
+  const prepared = [];
+  let totalBytes = 0;
+  let skipped = 0;
+
+  for (const { block, image } of downloads) {
+    if (image === undefined) {
       prepared.push(block);
       continue;
     }
 
-    if (totalBytes >= MAX_TOTAL_IMAGE_BYTES) {
-      skipped++;
-      continue;
-    }
-
-    const image = await fetchImageAsDataUrl(url);
-
-    if (!image) {
+    if (!image || totalBytes + image.bytes > MAX_TOTAL_IMAGE_BYTES) {
       skipped++;
       continue;
     }
