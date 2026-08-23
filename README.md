@@ -75,21 +75,34 @@ OPENAI_API_KEY=sk-...
 
 ## 📖 API Endpoints
 
+Все эндпоинты ниже требуют входа — сессия едет в httpOnly-куке.
+
+Долгие операции (анализ канала, генерация постов) есть в двух видах:
+обычный запрос и потоковый (SSE). Интерфейс ходит в потоковый: обычный
+запрос такой длины шлюз Railway обрывает с ошибкой 502 примерно
+на пятой минуте, хотя сервер работу доводит до конца.
+
 ### 1. Анализ канала
 ```bash
 POST /api/analyze/channel
 Content-Type: application/json
 
 {
-  "channel": "cvetidnya",
-  "postsCount": 30
+  "channel": "cvetidnya"
 }
 ```
+
+Потоковый вариант — `GET /api/analyze/channel/stream?channel=cvetidnya`.
+Шлёт события `{ step, message, progress }`, в финальном приходит
+`{ step: "complete", data: { channelId } }`.
+
+Канал сохраняется в кабинет в обоих случаях, всегда по 30 постам.
 
 **Ответ:**
 ```json
 {
   "success": true,
+  "channelId": 7,
   "channel": "cvetidnya",
   "analyzedPostsCount": 30,
   "brandCard": {
@@ -113,21 +126,25 @@ Content-Type: application/json
 
 ### 2. Генерация постов
 ```bash
-POST /api/analyze/generate-posts
+POST /api/channels/:id/posts
 Content-Type: application/json
 
 {
-  "brandCard": { ... },
-  "selectedTopicIds": [1, 3, 5, 7, 10],
-  "topics": [ ... ]
+  "selectedTopicIds": [1, 3, 5, 7, 10]
 }
 ```
+
+Темы и карточка бренда берутся из сохранённого канала, готовые посты
+туда же и складываются.
+
+Потоковый вариант — `GET /api/channels/:id/posts/stream?topicIds=1,3,5`.
+Событие приходит после каждого готового поста, так что прогресс честный.
 
 **Ответ:**
 ```json
 {
   "success": true,
-  "postsCount": 5,
+  "generatedCount": 5,
   "approvedCount": 4,
   "posts": [
     {
@@ -149,8 +166,7 @@ POST /api/generate/images
 Content-Type: application/json
 
 {
-  "posts": [ ... ],
-  "grokApiKey": "xai-..."
+  "posts": [ ... ]
 }
 ```
 

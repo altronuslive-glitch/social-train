@@ -30,6 +30,7 @@ async function startAnalysis() {
 
 /**
  * Запускает анализ и открывает получившийся канал.
+ * Прогресс показываем настоящий — сервер шлёт этапы по мере готовности.
  * @param {string} channel — адрес или имя канала
  */
 async function runAnalysis(channel) {
@@ -38,38 +39,18 @@ async function runAnalysis(channel) {
   setProgress(0, 'Запуск анализа...');
 
   try {
-    const request = api('/api/analyze/channel', { method: 'POST', body: { channel } });
-
-    // Пока сервер работает, ведём пользователя по этапам
-    const steps = [
-      [10, '📥 Парсинг постов из Telegram...'],
-      [25, '📝 Анализ текстового контента (tone of voice, структура)...'],
-      [45, '🎨 Анализ визуального контента (изображения, стиль)...'],
-      [65, '✅ Анализ завершён, формирование карточки бренда...'],
-      [85, '🎯 Создание единой карточки бренда...'],
-      [95, '💡 Генерация релевантных тем для постов...'],
-    ];
-
-    let finished = false;
-    (async () => {
-      for (const [percent, text] of steps) {
-        if (finished) return;
-        setProgress(percent, text);
-        await sleep(2500);
-      }
-    })();
-
-    const data = await request;
-    finished = true;
+    const { channelId } = await streamRequest(
+      `/api/analyze/channel/stream?channel=${encodeURIComponent(channel)}`,
+      ({ message, progress }) => setProgress(progress ?? 0, message),
+    );
 
     setProgress(100, '✅ Готово!');
     await sleep(300);
 
     document.getElementById('channel').value = '';
 
-    await openChannel(data.channelId);
+    await openChannel(channelId);
   } catch (error) {
-    finished = true;
     showError(error.message);
   }
 }

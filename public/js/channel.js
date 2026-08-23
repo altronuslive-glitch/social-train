@@ -254,20 +254,13 @@ async function generatePostsForChannel() {
   showScreen('loading');
   setProgress(5, `🤖 Генерирую ${selectedIds.length} постов...`);
 
-  // Пока сервер работает, показываем правдоподобный прогресс
-  let fakeProgress = 5;
-  const timer = setInterval(() => {
-    fakeProgress = Math.min(fakeProgress + 2, 92);
-    setProgress(fakeProgress, `✍️ Генерирую посты (SMM-агент → Image-агент → Арт-директор)...`);
-  }, 1500);
-
   try {
-    const data = await api(`/api/channels/${state.channel.id}/posts`, {
-      method: 'POST',
-      body: { selectedTopicIds: selectedIds },
-    });
+    // Потоком: каждый готовый пост сразу двигает прогресс
+    const data = await streamRequest(
+      `/api/channels/${state.channel.id}/posts/stream?topicIds=${selectedIds.join(',')}`,
+      ({ message, progress }) => setProgress(progress ?? 0, message),
+    );
 
-    clearInterval(timer);
     setProgress(100, '✅ Посты готовы!');
     await sleep(400);
 
@@ -276,7 +269,6 @@ async function generatePostsForChannel() {
     renderChannelView();
     showScreen('channelView');
   } catch (error) {
-    clearInterval(timer);
     showError(error.message);
   }
 }

@@ -72,6 +72,83 @@ async function api(url, { method = 'GET', body } = {}) {
   return data;
 }
 
+/**
+ * Читает потоковый эндпоинт (SSE) до финального события.
+ *
+ * Обычным запросом такие операции не сделать: анализ идёт около шести минут,
+ * а шлюз Railway рвёт запрос примерно на пятой и отдаёт 502 — хотя сервер
+ * работу доводит до конца. Поток же не простаивает, и рвать его нечему.
+ *
+ * Сессия едет в куке, которую браузер подставляет сам, — заголовки тут
+ * задать нельзя, но они и не нужны.
+ *
+ * @param {string} url — GET-адрес потокового эндпоинта
+ * @param {(event: {message: string, progress?: number}) => void} onProgress
+ * @returns {Promise<object>} поле data из финального события
+ */
+function streamRequest(url, onProgress) {
+  return new Promise((resolve, reject) => {
+    const source = new EventSource(url);
+    let settled = false;
+
+    const settle = (finish, value) => {
+      if (settled) return;
+      settled = true;
+      source.close();
+      finish(value);
+    };
+
+    source.onmessage = (event) => {
+      let data;
+      try {
+        data = JSON.parse(event.data);
+      } catch {
+        return; // мусор в потоке игнорируем, ждём следующее событие
+      }
+
+      if (data.step === 'complete') {
+        settle(resolve, data.data);
+      } else if (data.step === 'error') {
+        settle(reject, new Error(data.message));
+      } else {
+        onProgress(data);
+      }
+    };
+
+    // Закрыть соединение здесь обязательно: сам по себе EventSource
+    // переподключается молча и запустил бы всю генерацию заново.
+    source.onerror = async () => {
+      settle(reject, new Error(await describeStreamFailure()));
+    };
+  });
+}
+
+/**
+ * Уточняет причину обрыва потока.
+ *
+ * Через EventSource текст ошибки не прочитать — браузер отдаёт только сам
+ * факт обрыва. Но самая частая причина, истёкшая сессия, проверяется
+ * отдельным запросом: без неё сервер закрывает поток сразу, ещё до работы.
+ *
+ * @returns {Promise<string>} текст для пользователя
+ */
+async function describeStreamFailure() {
+  try {
+    const { user } = await api('/api/auth/me');
+
+    if (!user) {
+      // Приводим интерфейс в согласие с сервером: шапка снова покажет «Войти»
+      state.user = null;
+      renderTopbar();
+      return 'Сессия истекла — войдите заново.';
+    }
+  } catch {
+    // до сервера не достучались — значит дело точно не в сессии
+  }
+
+  return 'Соединение с сервером прервалось. Попробуйте ещё раз.';
+}
+
 function showError(message) {
   document.getElementById('errorText').textContent = message;
   showScreen('errorCard');
